@@ -1,0 +1,4 @@
+*.json
+*.svg
+**/.DS_Store
+*.gem

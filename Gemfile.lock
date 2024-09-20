@@ -1,0 +1,20 @@
+GIT
+  remote: git@github.com:wooki/emissary-names.git
+  revision: 3c132417120f5835faabaa79bf370bb529a71eaf
+  specs:
+    emissary-names (0.1.0)
+
+GEM
+  remote: https://rubygems.org/
+  specs:
+    titleize (1.4.1)
+
+PLATFORMS
+  x86_64-linux
+
+DEPENDENCIES
+  emissary-names!
+  titleize
+
+BUNDLED WITH
+   2.3.10
