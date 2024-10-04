@@ -650,12 +650,84 @@ require_relative 'map_utils.rb'
          }
 
 
+         # rename everything now we have it all linked up.
+         trade_nodes.each { | trade_node |
+            
+            # work out the namer we want for the region
+            terrain_in_region = Hash.new
+            @map.each { | key, hex |               
+               if (hex[:x] == trade_node[:x] and hex[:y] == trade_node[:y]) or
+                  (trade_node[:province] and hex[:x] == trade_node[:province][:x] and hex[:y] == trade_node[:province][:y]) or
+                  (trade_node[:province] and hex[:province] and hex[:province][:x] == trade_node[:province][:x] and hex[:province][:y] == trade_node[:province][:y])
+
+                  if !terrain_in_region[hex[:terrain]]
+                     terrain_in_region[hex[:terrain]] = 0
+                  end
+                  terrain_in_region[hex[:terrain]] = terrain_in_region[hex[:terrain]] + 1                  
+               end
+            }            
+            region = Names.get_culture_for_terrain(terrain_in_region)
+            namer = Names.for_culture(region)
+            trade_node[:name_region] = namer.culture
+            trade_node[:namer] = namer  
+            name = namer.get_name    
+            trade_node[:name] = "#{name} Region"          
+            trade_node[:trade][:name] = "#{name} Region"
+         }
+
+         # iterate every settlement and name based on that settlements region
+         @map.each { | key, hex |
+            if ['city', 'town'].include? hex[:terrain]
+               trade = getTradeNode hex
+               
+               if trade                  
+                  name = trade[:namer].get_name
+                  
+                  # name the node   
+                  hex[:name] = name
+
+                  # name the trade node                  
+                  hex[:trade][:name] = trade[:name]
+
+               else
+                  puts "no trade node found for #{hex[:x]},#{hex[:y]}"
+               end
+            end
+         }
+
+         # iterate all non settlements setting province and trade node
+         @map.each { | key, hex |
+            if !['city', 'town'].include? hex[:terrain]
+
+               province = getHex(hex[:province][:x], hex[:province][:y])
+               hex[:province][:name] = province[:name]
+
+               if hex[:trade] && !hex[:trade][:is_node]
+                  
+                  hex[:trade] = province[:trade]                      
+
+               elsif hex[:trade]
+                  
+                  if hex[:trade][:connected]
+                     hex[:trade][:connected].each { | key, connected |
+                     
+                     connected_node = getTradeNode connected
+                     connected[:name] = connected_node[:name]
+                     }
+                  end
+               end
+            end
+         }  
+         
          # remove some side-effect keys e.g. :z and :required_distance
          @map.each { | key, hex |
             hex.delete(:z)
             hex.delete(:required_distance)
          }
-
+         trade_nodes.each { | trade_node |
+            trade_node.delete(:namer)
+         }
+         
          @map
       end
 
@@ -670,13 +742,14 @@ require_relative 'map_utils.rb'
 
       def getTradeNode(coords)
          hex = getHex(coords[:x], coords[:y])
-         if hex[:trade] and trade[:x] and trade[:y]
-            getHex trade[:x], trade[:y]
+         if hex[:trade] and hex[:trade][:is_node] 
+            hex
+         elsif hex[:trade] and hex[:trade][:x] and hex[:trade][:y]
+            getHex hex[:trade][:x], hex[:trade][:y]
          else
             nil
          end
       end
-
 
       # finds all ocean hexs that are surrounded by ocean in all directions by at
       # least @trade_node_min_size
