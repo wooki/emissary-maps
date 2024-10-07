@@ -652,29 +652,42 @@ require_relative 'map_utils.rb'
 
          # rename everything now we have it all linked up.
          trade_nodes.each { | trade_node |
-            
+
             # work out the namer we want for the region
             terrain_in_region = Hash.new
             @map.each { | key, hex |               
-               if (hex[:x] == trade_node[:x] and hex[:y] == trade_node[:y]) or
-                  (trade_node[:province] and hex[:x] == trade_node[:province][:x] and hex[:y] == trade_node[:province][:y]) or
-                  (trade_node[:province] and hex[:province] and hex[:province][:x] == trade_node[:province][:x] and hex[:province][:y] == trade_node[:province][:y])
+            
+               hex_is_trade_node = hex[:x] == trade_node[:x] && hex[:y] == trade_node[:y]
+               hex_is_province_center = trade_node[:province] && hex[:x] == trade_node[:province][:x] && hex[:y] == trade_node[:province][:y]               
+               hex_is_in_trade_node = hex[:trade] && hex[:trade][:x] == trade_node[:x] && hex[:trade][:y] == trade_node[:y]
 
+               hex_is_province_area = false
+               if trade_node[:province] && hex[:province]
+                  province = getHex(hex[:province][:x], hex[:province][:y])
+                  hex_is_province_area = province[:trade][:x] == trade_node[:x] && province[:trade][:y] == trade_node[:y]
+               end
+
+               if hex_is_trade_node || hex_is_province_center || hex_is_province_area || hex_is_in_trade_node
+                  
                   if !terrain_in_region[hex[:terrain]]
                      terrain_in_region[hex[:terrain]] = 0
                   end
-                  terrain_in_region[hex[:terrain]] = terrain_in_region[hex[:terrain]] + 1                  
+                  terrain_in_region[hex[:terrain]] = terrain_in_region[hex[:terrain]] + 1                                                   
                end
-            }            
-            region = Names.get_culture_for_terrain(terrain_in_region)
+            }                        
+            region = Names.get_culture_for_terrain(terrain_in_region)            
             namer = Names.for_culture(region)
             trade_node[:name_region] = namer.culture
             trade_node[:namer] = namer  
             name = namer.get_name    
             trade_node[:name] = "#{name} Region"          
+            
+            total_terrain_count = terrain_in_region.values.sum
             trade_node[:trade][:name] = "#{name} Region"
          }
+         
 
+         
          # iterate every settlement and name based on that settlements region
          @map.each { | key, hex |
             if ['city', 'town'].include? hex[:terrain]
@@ -1195,10 +1208,12 @@ require_relative 'map_utils.rb'
                stroke_width = 1.0
                # terrain_color = trade_node_colors["#{hex.trade_node.x},#{hex.trade_node.y}".to_sym]
 
-            elsif terrain != "peak" and !is_trade_node?(hex) and hex[:trade]
-               # stroke = trade_node_colors["#{hex[:trade][:x]},#{hex[:trade][:y]}"]
-               # stroke_width = 2.0
-               terrain_color = trade_node_colors["#{hex[:trade][:x]},#{hex[:trade][:y]}"]
+            elsif terrain != "peak" and !is_trade_node?(hex) and !hex[:trade] and hex[:province]
+               capital = getHex hex[:province][:x], hex[:province][:y]
+               if capital and capital[:trade]
+                  stroke = trade_node_colors["#{capital[:trade][:x]},#{capital[:trade][:y]}"]
+                  stroke_width = 2.0
+               end               
             end
             io.print "\" fill=\"#{terrain_color}\" stroke=\"#{stroke}\" stroke-width=\"#{stroke_width}\" />"
 
