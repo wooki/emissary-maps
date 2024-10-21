@@ -622,7 +622,7 @@ require_relative 'map_utils.rb'
             # end
          }
 
-         # work out border areas, coast areas and adjacent provinces
+         # work out border areas and adjacent provinces
          @map.each { | key, hex |
             if ['city', 'town'].include? hex[:terrain]
 
@@ -630,15 +630,11 @@ require_relative 'map_utils.rb'
                # are it's neighbours
                neighbours = Array.new
                borders = Array.new
-               coastal_shallows = Array.new
-               hex[:areas].each { | area |
+               hex[:areas].each { | area |                                 
                   # check if adjacent areas are in a different province
                   adjacent = Emissary::MapUtils::adjacent({:x => area[:x], :y => area[:y]}, size)
                   adjacent.each { | adjacent_area |
                      adjacent_hex = getHex(adjacent_area[:x], adjacent_area[:y]);
-                     if area[:terrain] == 'ocean' && adjacent_hex[:terrain] != 'ocean'
-                        coastal_shallows.push({x: area[:x], y: area[:y]})
-                     end
                      if !['city', 'town'].include? adjacent_hex[:terrain]
                         if adjacent_hex[:province][:x] != hex[:x] or adjacent_hex[:province][:y] != hex[:y]
                            borders.push({x: area[:x], y: area[:y]})
@@ -649,8 +645,28 @@ require_relative 'map_utils.rb'
                }
 
                hex[:neighbours] = neighbours.uniq
-               hex[:borders] = borders.uniq
-               hex[:coast] = coastal_shallows.uniq
+               hex[:borders] = borders.uniq               
+            end
+         }
+
+         # itrare each province and log coast
+         @map.each { | key, hex |
+            if ['city', 'town'].include? hex[:terrain]
+
+               coast = Array.new
+               hex[:areas].each { | area | 
+                  a = getHex area[:x], area[:y]
+                  if a[:terrain] == 'ocean'
+                     adjacent = Emissary::MapUtils::adjacent({:x => area[:x], :y => area[:y]}, size)
+                     adjacent.each { | adjacent_area |
+                        adjacent_hex = getHex(adjacent_area[:x], adjacent_area[:y]);
+                        if adjacent_hex[:terrain] != 'ocean'
+                           coast.push({x: area[:x], y: area[:y]}) 
+                        end
+                     }  
+                  end
+               }
+               hex[:coast] = coast.uniq
             end
          }
 
