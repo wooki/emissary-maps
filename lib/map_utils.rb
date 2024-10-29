@@ -205,6 +205,44 @@ class MapUtils
 
    end
 
+   def get_hexes_in_range(state, startcoord, size, max_distance, exclude_ocean, terrain_weights)
+
+      hexes = []
+      checked = []
+
+      MapUtils::breadth_search(startcoord, size,
+         # can_be_traversed
+         Proc.new { |coord, path, startnode|
+            # Get terrain of current hex
+            terrain = state["#{coord[:x]},#{coord[:y]}"][:terrain]
+            
+            # Skip if it's ocean and we're excluding ocean
+            return false if exclude_ocean && terrain == :ocean
+            
+            # Calculate total path cost including current hex
+            path_cost = path.reduce(0) { |sum, hex| 
+               sum + (terrain_weights[state["#{hex[:x]},#{hex[:y]}"][:terrain]] || 1)
+            }
+            current_cost = terrain_weights[terrain] || 1
+            
+            # Allow traversal if within max_distance
+            (path_cost + current_cost) <= max_distance
+         },
+         # is_found
+         Proc.new { |coord, path|
+            # Add valid hex to results if not already included
+            hex_key = "#{coord[:x]},#{coord[:y]}"
+            if !hexes.include?(hex_key)
+               hexes.push(hex_key)
+            end
+            # Never "found" - continue searching until max_distance reached
+            false
+         },
+         checked
+      )
+
+      hexes      
+   end
 
    # look at adjacent hexs until match condition met, returning the path taken to that point
    def self.breadth_search(startcoord, size, can_be_traversed, is_found, checked=Array.new)
