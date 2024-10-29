@@ -214,14 +214,14 @@ class MapUtils
          # can_be_traversed
          Proc.new { |coord, path, startnode|
             # Get terrain of current hex
-            terrain = state["#{coord[:x]},#{coord[:y]}"][:terrain]
+            terrain = state.getHex(coord)[:terrain]
             
             # Skip if it's ocean and we're excluding ocean
             return false if exclude_ocean && terrain == :ocean
             
             # Calculate total path cost including current hex
             path_cost = path.reduce(0) { |sum, hex| 
-               sum + (terrain_weights[state["#{hex[:x]},#{hex[:y]}"][:terrain]] || 1)
+               sum + (terrain_weights[state.getHex(hex)][:terrain]] || 1)
             }
             current_cost = terrain_weights[terrain] || 1
             
