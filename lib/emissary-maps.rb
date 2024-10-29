@@ -75,7 +75,17 @@ require_relative 'map_utils.rb'
             'desert' => 0.001
          }
          @population_settlement_boost = [4.0, 3.0, 2.0, 1.0, 1.0, 0.75, 0.5, 0.25, 0.2, 0.15];
-
+         @land_travel = {
+            'city' => 32,
+            'town' => 32,
+            'lowland' => 32,
+            'forest' => 16,
+            'mountain' => 6,
+            'desert' => 8,
+            'ocean' => 3,
+            'peak' => 1
+         }
+         
          # store the map as we build it
          @map = Hash.new
 
@@ -583,8 +593,15 @@ require_relative 'map_utils.rb'
                   adjustment = 1.0
                   adjustment = adjustment + (adj['ocean'].to_f * 0.05) if adj['ocean'] > 0
 
+                  # route with weighted distance
+                  weighted_distance = lambda do | coord, path |
+                     mapcoord = getHex(coord[:x], coord[:y])
+                     return 0 if !mapcoord                     
+                     @land_travel[mapcoord[:terrain]]
+                  end
+
                   # adjusted by distance to closest town/city
-                  path = find_closest_terrain({:x => hex[:x], :y => hex[:y]}, ['town', 'city'], size)
+                  path = find_closest_terrain({:x => hex[:x], :y => hex[:y]}, ['town', 'city'], size, exclude=[], weight=weighted_distance)
                   if !path.nil?
 
                      if path.length > (@population_settlement_boost.length - 1)
@@ -1132,13 +1149,16 @@ require_relative 'map_utils.rb'
          end
       end
 
-      def find_closest_terrain(start, terrain, size, exclude=[])
+      def find_closest_terrain(start, terrain, size, exclude=[], weight=nil)
 
          terrain = [terrain] if !terrain.kind_of?(Array)
 
          terrain_found = lambda do | coord, path |
             mapcoord = getHex(coord[:x], coord[:y])
             terrain.include? mapcoord[:terrain]
+         end
+         if weight
+            return Emissary::MapUtils::weighted_breadth_search({:x => start[:x], :y => start[:y]}, size, nil, terrain_found, exclude, weight=weight)
          end
 
          return Emissary::MapUtils::breadth_search({:x => start[:x], :y => start[:y]}, size, nil, terrain_found, exclude)

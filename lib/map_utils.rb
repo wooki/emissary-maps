@@ -1,3 +1,5 @@
+require 'algorithms'
+
 module Emissary
 
 class MapUtils
@@ -206,6 +208,64 @@ class MapUtils
    end
 
    
+   # look at adjacent hexs until match condition met, returning the path taken to that point
+   def self.weighted_breadth_search(startcoord, size, can_be_traversed, is_found, checked=Array.new, weight=nil)
+
+      # add coord to the queue and then process the queue
+      queue = Containers::PriorityQueue.new
+      queue.push({
+         :coord => startcoord,
+         :path => Array.new,
+         :score => 0
+      }, 0)
+
+      startnode = true
+      while queue.length > 0 do
+
+         # get coord to process
+         step = queue.pop
+         coord = step[:coord]
+         path = step[:path]
+         total_score = step[:score]
+
+         # check if coord is inside map and not excluded
+         if MapUtils::mapcontains(size, {x: coord[:x], y: coord[:y]}) and
+            !checked.include? "#{coord[:x]},#{coord[:y]}"
+
+            # add to checked
+            checked.push "#{coord[:x]},#{coord[:y]}"
+
+            # check if this hex should be blocked
+            if can_be_traversed.nil? or can_be_traversed.call(coord, path, startnode)
+
+               startnode = false
+
+               # check if this search complete and return path
+               if is_found.call(coord, path)
+                  return path.push(coord)
+               else
+
+                  # add all adjacents to the queue
+                  transforms = self.adjacent_transforms
+                  transforms.each { | transform |
+
+                     # add to queue
+                     nextcoord = MapUtils::transform_coord(coord, transform)
+                     step_score = weight.nil? ? 0 : weight.call(nextcoord, path)
+                     queue.push({
+                        :coord => nextcoord,
+                        :path => Array.new.replace(path).push(nextcoord),
+                        :score => total_score + step_score
+                     }, total_score + step_score)
+                  }
+               end # found
+
+            end # dont traverse
+         end # not in map or excluded
+      end # more to process
+
+      nil
+   end
 
    # look at adjacent hexs until match condition met, returning the path taken to that point
    def self.breadth_search(startcoord, size, can_be_traversed, is_found, checked=Array.new)
