@@ -221,7 +221,7 @@ class MapUtils
             
             # Calculate total path cost including current hex
             path_cost = path.reduce(0) { |sum, hex| 
-               sum + (terrain_weights[state.getHex(hex)][:terrain]] || 1)
+               sum + (terrain_weights[state.getHex(hex)[:terrain]] || 1)
             }
             current_cost = terrain_weights[terrain] || 1
             
