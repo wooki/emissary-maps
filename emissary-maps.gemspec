@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
     s.name        = "emissary-maps"
-    s.version     = "0.1.1"
+    s.version     = "0.1.2"
     s.summary     = "Hex map generator"
     s.description = "Build a hex map for Emissary and write as JSON or SVG"
     s.authors     = ["Jim Rowe"]
