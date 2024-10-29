@@ -179,7 +179,7 @@ class MapUtils
 
    # keep transforming coord until terrain type found and return
    # the distance
-   def find_terrain_by_transform(start, transform, terrain, size, exclude=[])
+   def self.find_terrain_by_transform(start, transform, terrain, size, exclude=[])
 
       # move one coord
       nextcoord = MapUtils::transform_coord(start, transform)
@@ -195,7 +195,7 @@ class MapUtils
       if @map["#{nextcoord[:x]},#{nextcoord[:y]}"][:terrain] == terrain
          return 1
       else
-         rest_of_search = find_terrain_by_transform(nextcoord, transform, terrain, size)
+         rest_of_search = MapUtils.find_terrain_by_transform(nextcoord, transform, terrain, size)
          if rest_of_search == nil
             return nil
          else
@@ -205,7 +205,7 @@ class MapUtils
 
    end
 
-   def get_hexes_in_range(state, startcoord, size, max_distance, exclude_ocean, terrain_weights)
+   def self.get_hexes_in_range(state, startcoord, size, max_distance, exclude_ocean, terrain_weights)
 
       hexes = []
       checked = []
