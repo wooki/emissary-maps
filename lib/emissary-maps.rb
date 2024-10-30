@@ -80,10 +80,10 @@ require_relative 'map_utils.rb'
             'town' => -1,
             'lowland' => -10,
             'forest' => -20,
-            'mountain' => -35,
-            'desert' => -30,
-            'ocean' => -40,
-            'peak' => -50
+            'mountain' => -30,
+            'desert' => -25,
+            'ocean' => -50,
+            'peak' => -60
          }
          
          # store the map as we build it
@@ -638,6 +638,40 @@ require_relative 'map_utils.rb'
                end
             # end
          }
+
+         # check if any hex is not adjacent to another hex of the same province
+         # and just assign it to a different province
+         @map.each { | key, hex |
+            if !['city', 'town'].include? hex[:terrain]
+               adjacent = Emissary::MapUtils::adjacent({:x => hex[:x], :y => hex[:y]}, size)
+               same_province = false
+               adjacent.each { | adjacent_area |
+                  adjacent_hex = getHex(adjacent_area[:x], adjacent_area[:y])
+                  if adjacent_hex[:province] and hex[:province] and 
+                     adjacent_hex[:province][:x] == hex[:province][:x] and 
+                     adjacent_hex[:province][:y] == hex[:province][:y]
+                     same_province = true
+                     break
+                  end
+               }
+               
+               if !same_province
+                  adjacent_provinces = adjacent.map { |a| getHex(a[:x], a[:y]) }.select { |h| h[:province] }
+                  if adjacent_provinces.length > 0
+                     new_province = adjacent_provinces.sample
+                     hex[:province] = {
+                        :name => new_province[:province][:name],
+                        :x => new_province[:province][:x],
+                        :y => new_province[:province][:y],
+                        :distance => new_province[:province][:distance]
+                     }
+                     province = getHex(new_province[:province][:x], new_province[:province][:y])
+                     province[:areas].push({:x => hex[:x], :y => hex[:y]})
+                  end                  
+               end
+            end
+         }
+               
 
          # work out border areas and adjacent provinces
          @map.each { | key, hex |
