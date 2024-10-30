@@ -76,14 +76,14 @@ require_relative 'map_utils.rb'
          }
          @population_settlement_boost = [4.0, 3.0, 2.0, 1.0, 1.0, 0.75, 0.5, 0.25, 0.2, 0.15];
          @land_travel = {
-            'city' => 32,
-            'town' => 32,
-            'lowland' => 32,
-            'forest' => 16,
-            'mountain' => 6,
-            'desert' => 8,
-            'ocean' => 3,
-            'peak' => 1
+            'city' => -1,
+            'town' => -1,
+            'lowland' => -10,
+            'forest' => -20,
+            'mountain' => -35,
+            'desert' => -30,
+            'ocean' => -40,
+            'peak' => -50
          }
          
          # store the map as we build it
@@ -1244,16 +1244,16 @@ require_relative 'map_utils.rb'
             stroke_width= 0.1
             if terrain == "ocean" and !(is_trade_node?(hex) and hex[:trade])
 
-               stroke = trade_node_colors["#{hex[:trade][:x]},#{hex[:trade][:y]}"]
-               stroke_width = 1.0
+               # stroke = trade_node_colors["#{hex[:trade][:x]},#{hex[:trade][:y]}"]
+               # stroke_width = 1.0
                # terrain_color = trade_node_colors["#{hex.trade_node.x},#{hex.trade_node.y}".to_sym]
 
             elsif terrain != "peak" and !is_trade_node?(hex) and !hex[:trade] and hex[:province]
-               capital = getHex hex[:province][:x], hex[:province][:y]
-               if capital and capital[:trade]
-                  stroke = trade_node_colors["#{capital[:trade][:x]},#{capital[:trade][:y]}"]
-                  stroke_width = 2.0
-               end               
+               # capital = getHex hex[:province][:x], hex[:province][:y]
+               # if capital and capital[:trade]
+               #    stroke = trade_node_colors["#{capital[:trade][:x]},#{capital[:trade][:y]}"]
+               #    stroke_width = 2.0
+               # end               
             end
             io.print "\" fill=\"#{terrain_color}\" stroke=\"#{stroke}\" stroke-width=\"#{stroke_width}\" />"
 
@@ -1269,6 +1269,22 @@ require_relative 'map_utils.rb'
 
             # io.print "<text font-size=\"8px\" x=\"#{x}\" y=\"#{pos[:y]}\" fill=\"white\">#{hex[:x]},#{hex[:y]}</text>"
          }
+
+         # Draw lines from non-city/town hexes to their province capitals
+         @map.each { |key, hex|
+            if hex[:province] && hex[:terrain] != "city" && hex[:terrain] != "town"
+               province_hex = getHex(hex[:province][:x], hex[:province][:y])
+               if province_hex
+                  start_pos = Emissary::MapUtils::hex_pos(hex[:x], hex[:y], hexsize, xoffset, yoffset)
+                  end_pos = Emissary::MapUtils::hex_pos(province_hex[:x], province_hex[:y], hexsize, xoffset, yoffset)
+                  
+                  io.print "<line x1=\"#{start_pos[:x].round(2)}\" y1=\"#{start_pos[:y].round(2)}\" " +
+                           "x2=\"#{end_pos[:x].round(2)}\" y2=\"#{end_pos[:y].round(2)}\" " +
+                           "stroke=\"red\" stroke-width=\"0.5\" stroke-opacity=\"0.3\" />"
+               end
+            end
+         }
+
 
          # town and city labels
          @map.each { | key, hex |
