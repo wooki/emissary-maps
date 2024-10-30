@@ -639,36 +639,30 @@ require_relative 'map_utils.rb'
             # end
          }
 
-         # check if any hex is not adjacent to another hex of the same province
-         # and just assign it to a different province
          @map.each { | key, hex |
+
             if !['city', 'town'].include? hex[:terrain]
-               adjacent = Emissary::MapUtils::adjacent({:x => hex[:x], :y => hex[:y]}, size)
-               same_province = false
-               adjacent.each { | adjacent_area |
-                  adjacent_hex = getHex(adjacent_area[:x], adjacent_area[:y])
-                  if adjacent_hex[:province] and hex[:province] and 
-                     adjacent_hex[:province][:x] == hex[:province][:x] and 
-                     adjacent_hex[:province][:y] == hex[:province][:y]
-                     same_province = true
-                     break
-                  end
-               }
-               
-               if !same_province
-                  adjacent_provinces = adjacent.map { |a| getHex(a[:x], a[:y]) }.select { |h| h[:province] }
-                  if adjacent_provinces.length > 0
-                     new_province = adjacent_provinces.sample
-                     hex[:province] = {
-                        :name => new_province[:province][:name],
-                        :x => new_province[:province][:x],
-                        :y => new_province[:province][:y],
-                        :distance => new_province[:province][:distance]
-                     }
-                     province = getHex(new_province[:province][:x], new_province[:province][:y])
-                     province[:areas].push({:x => hex[:x], :y => hex[:y]})
-                  end                  
+
+               other_province = nil
+
+               # check for a path back to the capital and if there isn't one switch to an adjacent province and check again
+               is_found = lambda do | coord, path |
+                  coord[:x] == hex[:province][:x] and coord[:y] == hex[:province][:y]                                    
                end
+
+               can_be_traversed = lambda do | coord, path, is_first |
+
+                  return true if is_found.call(coord, path)
+                  mapcoord = @map["#{coord[:x]},#{coord[:y]}"]
+                  return false if ['city', 'town'].include? mapcoord[:terrain]
+                  
+                  same_province = mapcoord[:province][:x] == hex[:province][:x] and mapcoord[:province][:y] == hex[:province][:y]
+                  other_province = mapcoord[:province] if !same_province && !other_province
+                  same_province
+               end
+
+               path = Emissary::MapUtils::breadth_search({:x => hex[:x], :y => hex[:y]}, size, can_be_traversed, is_found)
+               hex[:province] = other_province if path.nil?                                                 
             end
          }
                
