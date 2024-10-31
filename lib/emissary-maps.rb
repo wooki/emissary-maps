@@ -655,46 +655,54 @@ require_relative 'map_utils.rb'
 
                path = Emissary::MapUtils::breadth_search({:x => hex[:x], :y => hex[:y]}, size, can_be_traversed, is_found)
                
-               hex[:province] = other_province if path.nil? if other_province                                            
+               if path.nil? && other_province                                            
+                  # remove from areas of original province and add to the new province
+                  capital_area = getHex hex[:province][:x], hex[:province][:y]
+                  capital_area[:areas].delete({:x => hex[:x], :y => hex[:y]})
+
+                  other_province_area = getHex other_province[:x], other_province[:y]
+                  other_province_area[:areas] = Array.new if !other_province[:areas]
+                  other_province_area[:areas].push({:x => hex[:x], :y => hex[:y]})
+
+                  # set the new province
+                  hex[:province] = other_province 
+               end
             end
          }
 
-         # try again for debugging (do twice because first run might cause the issue)     
-         1.times {
-            @map.each { | key, hex |
+         @map.each { | key, hex |
 
-               if !['city', 'town'].include? hex[:terrain]
+            if !['city', 'town'].include? hex[:terrain]
 
-                  other_province = nil
+               other_province = nil
 
-                  debug = false
-                  debug = true if hex[:x] == 42 and hex[:y] == 52
-                  
-                  # have we arrived at the capital
-                  is_found = lambda do | coord, path |
-                     coord[:x] == hex[:province][:x] and coord[:y] == hex[:province][:y]                                    
-                  end
-
-                  # only traverse if we are in the same province
-                  can_be_traversed = lambda do | coord, path, is_first |
-
-                     return true if is_found.call(coord, path)
-                     mapcoord = @map["#{coord[:x]},#{coord[:y]}"]
-                     return false if ['city', 'town'].include? mapcoord[:terrain]
-                     
-                     
-                     same_province = (mapcoord[:province][:x] == hex[:province][:x]) && (mapcoord[:province][:y] == hex[:province][:y])
-                     
-                     other_province = mapcoord[:province] if !same_province && !other_province
-                     same_province
-                  end
-
-                  path = Emissary::MapUtils::breadth_search({:x => hex[:x], :y => hex[:y]}, size, can_be_traversed, is_found)
-
-                  # hex[:province] = other_province if path.nil?                                                 
-                  @map[key][:province] = other_province if path.nil?
+               debug = false
+               debug = true if hex[:x] == 42 and hex[:y] == 52
+               
+               # have we arrived at the capital
+               is_found = lambda do | coord, path |
+                  coord[:x] == hex[:province][:x] and coord[:y] == hex[:province][:y]                                    
                end
-            }
+
+               # only traverse if we are in the same province
+               can_be_traversed = lambda do | coord, path, is_first |
+
+                  return true if is_found.call(coord, path)
+                  mapcoord = @map["#{coord[:x]},#{coord[:y]}"]
+                  return false if ['city', 'town'].include? mapcoord[:terrain]
+                  
+                  
+                  same_province = (mapcoord[:province][:x] == hex[:province][:x]) && (mapcoord[:province][:y] == hex[:province][:y])
+                  
+                  other_province = mapcoord[:province] if !same_province && !other_province
+                  same_province
+               end
+
+               path = Emissary::MapUtils::breadth_search({:x => hex[:x], :y => hex[:y]}, size, can_be_traversed, is_found)
+
+               # hex[:province] = other_province if path.nil?                                                 
+               @map[key][:province] = other_province if path.nil?
+            end
          }
                
 
@@ -1330,19 +1338,19 @@ require_relative 'map_utils.rb'
          }
 
          # Draw lines from non-city/town hexes to their province capitals
-         @map.each { |key, hex|
-            if hex[:province] && hex[:terrain] != "city" && hex[:terrain] != "town"
-               province_hex = getHex(hex[:province][:x], hex[:province][:y])
-               if province_hex
-                  start_pos = Emissary::MapUtils::hex_pos(hex[:x], hex[:y], hexsize, xoffset, yoffset)
-                  end_pos = Emissary::MapUtils::hex_pos(province_hex[:x], province_hex[:y], hexsize, xoffset, yoffset)
+         # @map.each { |key, hex|
+         #    if hex[:province] && hex[:terrain] != "city" && hex[:terrain] != "town"
+         #       province_hex = getHex(hex[:province][:x], hex[:province][:y])
+         #       if province_hex
+         #          start_pos = Emissary::MapUtils::hex_pos(hex[:x], hex[:y], hexsize, xoffset, yoffset)
+         #          end_pos = Emissary::MapUtils::hex_pos(province_hex[:x], province_hex[:y], hexsize, xoffset, yoffset)
                   
-                  io.print "<line x1=\"#{start_pos[:x].round(2)}\" y1=\"#{start_pos[:y].round(2)}\" " +
-                           "x2=\"#{end_pos[:x].round(2)}\" y2=\"#{end_pos[:y].round(2)}\" " +
-                           "stroke=\"red\" stroke-width=\"0.5\" stroke-opacity=\"0.3\" />"
-               end
-            end
-         }
+         #          io.print "<line x1=\"#{start_pos[:x].round(2)}\" y1=\"#{start_pos[:y].round(2)}\" " +
+         #                   "x2=\"#{end_pos[:x].round(2)}\" y2=\"#{end_pos[:y].round(2)}\" " +
+         #                   "stroke=\"red\" stroke-width=\"0.5\" stroke-opacity=\"0.3\" />"
+         #       end
+         #    end
+         # }
 
 
          # town and city labels
@@ -1400,7 +1408,7 @@ require_relative 'map_utils.rb'
                      if shared_points.length == 2
                         io.print "<line x1=\"#{shared_points[0][:x].round(2)}\" y1=\"#{shared_points[0][:y].round(2)}\" " +
                                  "x2=\"#{shared_points[1][:x].round(2)}\" y2=\"#{shared_points[1][:y].round(2)}\" " +
-                                 "stroke=\"red\" stroke-width=\"2\" />"
+                                 "stroke=\"black\" stroke-width=\"2\" />"
                      end
                   end
                end
