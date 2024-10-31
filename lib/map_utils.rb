@@ -249,12 +249,12 @@ class MapUtils
                   transforms = self.adjacent_transforms
                   transforms.each { | transform |
 
-                     # add to queue
+                     # calculate next coord and score before pushing
                      nextcoord = MapUtils::transform_coord(coord, transform)
-                     step_score = weight.nil? ? 0 : weight.call(nextcoord, path)
+                     step_score = weight.nil? ? 0 : weight.call(coord, path)
                      queue.push({
                         :coord => nextcoord,
-                        :path => Array.new.replace(path).push(nextcoord),
+                        :path => Array.new.replace(path).push(coord),
                         :score => total_score + step_score
                      }, total_score + step_score)
                   }
@@ -266,7 +266,6 @@ class MapUtils
 
       nil
    end
-
    # look at adjacent hexs until match condition met, returning the path taken to that point
    def self.breadth_search(startcoord, size, can_be_traversed, is_found, checked=Array.new)
 

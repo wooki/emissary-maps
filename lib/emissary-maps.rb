@@ -76,14 +76,16 @@ require_relative 'map_utils.rb'
          }
          @population_settlement_boost = [4.0, 3.0, 2.0, 1.0, 1.0, 0.75, 0.5, 0.25, 0.2, 0.15];
          @land_travel = {
-            'city' => -1,
-            'town' => -1,
+            'city' => -5,
+            'town' => -5,
             'lowland' => -10,
             'forest' => -20,
             'mountain' => -30,
             'desert' => -25,
-            'ocean' => -50,
-            'peak' => -60
+            'ocean' => -1,
+            'peak' => -200,
+            'embark' => -180,
+            'disembark' => -200,
          }
          
          # store the map as we build it
@@ -320,11 +322,16 @@ require_relative 'map_utils.rb'
 
             # we won't have a path because we aren't going anywhere specific
             path_to_closest = Emissary::MapUtils::breadth_search({:x => hex[:x], :y => hex[:y]}, size, can_be_traversed, settlement_found)
-            closest = getHex(path_to_closest.last[:x], path_to_closest.last[:y])
-            hex[:trade] = {
-               :name => "#{closest[:name]} Trade Node",
-               :is_node => true
-            }
+            if path_to_closest
+               closest = getHex(path_to_closest.last[:x], path_to_closest.last[:y])
+               hex[:trade] = {
+                  :name => "#{closest[:name]} Trade Node",
+                  :is_node => true
+               }
+            else
+               # need some info to diagnose why this sometimes happens
+               raise "Could not find closest settlement to trade node: #{hex}"
+            end
          }
 
          # assign each town/city to closest trade node via ocean
@@ -541,9 +548,7 @@ require_relative 'map_utils.rb'
             base_population = @population[hex[:terrain]]
             base_food = @food[hex[:terrain]]
             base_goods = @goods[hex[:terrain]]
-
-            # if !base_population.nil?
-
+            
                # always adjusted a bit for randomness
                base_population = 0 if base_population.nil?
                base_population = base_population + ((base_population.to_f / 100.0) * rand() * rand(-15..15).to_f).round.to_i
@@ -559,32 +564,7 @@ require_relative 'map_utils.rb'
 
                   base_population = (base_population.to_f * adjustment).round.to_i
                   hex[:population] = base_population
-
-                  # find closest other settlement (now done later)
-                  # settlement_found = lambda do | coord, path |
-                  #    return false if hex[:x] == coord[:x] and hex[:y] == coord[:y]
-                  #    mapcoord = getHex(coord[:x], coord[:y])
-                  #    ["city", "town"].include? mapcoord[:terrain]
-                  # end
-
-                  # can_be_traversed = lambda do | coord, path, is_first |
-                  #    mapcoord = getHex(coord[:x], coord[:y])
-                  #    not (["ocean", "peak"].include? mapcoord[:terrain])
-                  # end
-
-                  # # find closest neighbour - implement something in settlement found to
-                  # # find closest 2 or 3 in the future.
-                  # path_to_closest = Emissary::MapUtils::breadth_search({:x => hex[:x], :y => hex[:y]}, size, can_be_traversed, settlement_found)
-                  # if path_to_closest
-                  #    province = getHex path_to_closest.last[:x], path_to_closest.last[:y]
-                  #    hex[:neighbours] = Array.new
-                  #    hex[:neighbours].push({
-                  #       :name => province[:name],
-                  #       :x => path_to_closest.last[:x],
-                  #       :y => path_to_closest.last[:y],
-                  #       :distance => path_to_closest.length
-                  #    })
-                  # end
+                  
 
                else
 
@@ -596,7 +576,16 @@ require_relative 'map_utils.rb'
                   # route with weighted distance
                   weighted_distance = lambda do | coord, path |
                      mapcoord = getHex(coord[:x], coord[:y])
-                     return 0 if !mapcoord                     
+                     return 0 if !mapcoord                                       
+                     return @land_travel[mapcoord[:terrain]] if path.length == 0
+
+                     previous = getHex(path.last[:x], path.last[:y])
+                     if previous[:terrain] == 'ocean' && mapcoord[:terrain] != 'ocean' 
+                        return @land_travel[mapcoord[:terrain]] + @land_travel['disembark']
+                     elsif !['city', 'town', 'ocean'].include?(previous[:terrain]) && mapcoord[:terrain] == 'ocean' 
+                        return @land_travel[mapcoord[:terrain]] + @land_travel['embark']
+                     end                    
+
                      @land_travel[mapcoord[:terrain]]
                   end
 
@@ -639,21 +628,24 @@ require_relative 'map_utils.rb'
             # end
          }
 
+         # check if we can reach the province capital from every hex
          @map.each { | key, hex |
 
             if !['city', 'town'].include? hex[:terrain]
 
                other_province = nil
 
-               # check for a path back to the capital and if there isn't one switch to an adjacent province and check again
+               # have we arrived at the capital
                is_found = lambda do | coord, path |
                   coord[:x] == hex[:province][:x] and coord[:y] == hex[:province][:y]                                    
                end
 
+               # only traverse if we are in the same province
                can_be_traversed = lambda do | coord, path, is_first |
 
                   return true if is_found.call(coord, path)
                   mapcoord = @map["#{coord[:x]},#{coord[:y]}"]
+                  return false if hex[:terrain] == 'ocean' and mapcoord[:terrain] != 'ocean'
                   return false if ['city', 'town'].include? mapcoord[:terrain]
                   
                   same_province = mapcoord[:province][:x] == hex[:province][:x] and mapcoord[:province][:y] == hex[:province][:y]
@@ -662,8 +654,47 @@ require_relative 'map_utils.rb'
                end
 
                path = Emissary::MapUtils::breadth_search({:x => hex[:x], :y => hex[:y]}, size, can_be_traversed, is_found)
-               hex[:province] = other_province if path.nil?                                                 
+               
+               hex[:province] = other_province if path.nil? if other_province                                            
             end
+         }
+
+         # try again for debugging (do twice because first run might cause the issue)     
+         1.times {
+            @map.each { | key, hex |
+
+               if !['city', 'town'].include? hex[:terrain]
+
+                  other_province = nil
+
+                  debug = false
+                  debug = true if hex[:x] == 42 and hex[:y] == 52
+                  
+                  # have we arrived at the capital
+                  is_found = lambda do | coord, path |
+                     coord[:x] == hex[:province][:x] and coord[:y] == hex[:province][:y]                                    
+                  end
+
+                  # only traverse if we are in the same province
+                  can_be_traversed = lambda do | coord, path, is_first |
+
+                     return true if is_found.call(coord, path)
+                     mapcoord = @map["#{coord[:x]},#{coord[:y]}"]
+                     return false if ['city', 'town'].include? mapcoord[:terrain]
+                     
+                     
+                     same_province = (mapcoord[:province][:x] == hex[:province][:x]) && (mapcoord[:province][:y] == hex[:province][:y])
+                     
+                     other_province = mapcoord[:province] if !same_province && !other_province
+                     same_province
+                  end
+
+                  path = Emissary::MapUtils::breadth_search({:x => hex[:x], :y => hex[:y]}, size, can_be_traversed, is_found)
+
+                  # hex[:province] = other_province if path.nil?                                                 
+                  @map[key][:province] = other_province if path.nil?
+               end
+            }
          }
                
 
@@ -1295,7 +1326,7 @@ require_relative 'map_utils.rb'
                io.print "<use href=\"#trade\" x=\"#{x.round(2)}\"  y=\"#{y.round(2)}\" fill=\"black\" style=\"opacity:0.8\" />"
             end
 
-            # io.print "<text font-size=\"8px\" x=\"#{x}\" y=\"#{pos[:y]}\" fill=\"white\">#{hex[:x]},#{hex[:y]}</text>"
+            io.print "<text font-size=\"8px\" x=\"#{x}\" y=\"#{pos[:y]}\" fill=\"white\">#{hex[:x]},#{hex[:y]}</text>"
          }
 
          # Draw lines from non-city/town hexes to their province capitals
@@ -1335,6 +1366,45 @@ require_relative 'map_utils.rb'
                text = hex[:trade][:name] if text.nil?
                io.print "<text font-size=\"#{font_size}\" x=\"#{x}\" y=\"#{y}\" fill=\"#{color}\">#{text}</text>"
 
+            end
+         }
+
+         # draw borders
+         @map.each { | key, hex |
+            if hex[:terrain] == "city" or hex[:terrain] == "town"
+               borders = hex[:borders]
+               borders.each do |border_coord|
+                  border_hex = getHex(border_coord[:x], border_coord[:y])
+                  adjacent_hexes = Emissary::MapUtils::adjacent(border_hex, @size).map { |adj_hex| getHex(adj_hex[:x], adj_hex[:y]) }                  
+                  different_province_hexes = adjacent_hexes.select { |adj_hex|                      
+                     if adj_hex[:province]
+                        adj_hex[:province][:x] != border_hex[:province][:x] or adj_hex[:province][:y] != border_hex[:province][:y]
+                     else
+                        adj_hex[:name] != border_hex[:province][:name]
+                     end
+                  }
+
+                  border_pos = Emissary::MapUtils::hex_pos(border_hex[:x], border_hex[:y], hexsize, xoffset, yoffset)
+                  border_points = Emissary::MapUtils::hex_points(border_pos[:x], border_pos[:y], hexsize)
+                     
+                  different_province_hexes.each do |adj_hex|                     
+                     adj_pos = Emissary::MapUtils::hex_pos(adj_hex[:x], adj_hex[:y], hexsize, xoffset, yoffset)                     
+                     adj_points = Emissary::MapUtils::hex_points(adj_pos[:x], adj_pos[:y], hexsize)
+                     
+                     shared_points = border_points.select { |bp|
+                        adj_points.any? { |ap| 
+                           (bp[:x] - ap[:x]).abs < 0.01 && (bp[:y] - ap[:y]).abs < 0.01
+                        }
+                     }
+
+                     if shared_points.length == 2
+                        io.print "<line x1=\"#{shared_points[0][:x].round(2)}\" y1=\"#{shared_points[0][:y].round(2)}\" " +
+                                 "x2=\"#{shared_points[1][:x].round(2)}\" y2=\"#{shared_points[1][:y].round(2)}\" " +
+                                 "stroke=\"red\" stroke-width=\"2\" />"
+                     end
+                  end
+               end
+               
             end
          }
 
