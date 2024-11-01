@@ -8,7 +8,8 @@ require_relative '../lib/emissary-maps.rb'
 options = {
    size: 100,
    hexsize: 18,
-   format: 'SVG'
+   format: 'SVG',
+   debug: false
 }
 OptionParser.new do | opts |
    opts.banner = "Usage: emissary-map --file=map.svg --format=SVG --size=100"
@@ -30,13 +31,19 @@ OptionParser.new do | opts |
    end
 
    opts.on("-hHEXSIZE", "--hexsize=HEXSIZE", "Size to draw each hex in the Svg") do |n|
-     options[:hexsize] = n.to_i
+      options[:hexsize] = n.to_i
+    end
+    
+   opts.on("-d", "--debug", "Enable debug mode") do
+      options[:debug] = true
    end
+    
 end.parse!
 
 seeded = nil
 seeded = options[:seed]
 mg = Emissary::Maps.new seeded
+mg.debug = options[:debug]
 
 map = mg.generate options[:size]
 

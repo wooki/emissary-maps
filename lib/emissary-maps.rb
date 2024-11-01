@@ -9,9 +9,11 @@ require_relative 'map_utils.rb'
 #
    class Maps
 
-      attr_accessor :seed
+      attr_accessor :seed, :debug
 
       def initialize(seed=nil)
+
+         @debug = false
 
          @fng_fantasy = Emissary::Names.for_culture('fantasy')
          @fng_arid = Emissary::Names.for_culture('arid')
@@ -657,12 +659,11 @@ require_relative 'map_utils.rb'
                
                if path.nil? && other_province                                            
                   # remove from areas of original province and add to the new province
-                  capital_area = getHex hex[:province][:x], hex[:province][:y]
-                  capital_area[:areas].delete({:x => hex[:x], :y => hex[:y]})
-
-                  other_province_area = getHex other_province[:x], other_province[:y]
-                  other_province_area[:areas] = Array.new if !other_province[:areas]
-                  other_province_area[:areas].push({:x => hex[:x], :y => hex[:y]})
+                  original_province_area = getHex hex[:province][:x], hex[:province][:y]
+                  new_capital_area = getHex other_province[:x], other_province[:y]
+                  
+                  original_province_area[:areas].delete_if { |area| area[:x] == hex[:x] && area[:y] == hex[:y] }
+                  new_capital_area[:areas].push({:x => hex[:x], :y => hex[:y]})
 
                   # set the new province
                   hex[:province] = other_province 
@@ -1334,23 +1335,27 @@ require_relative 'map_utils.rb'
                io.print "<use href=\"#trade\" x=\"#{x.round(2)}\"  y=\"#{y.round(2)}\" fill=\"black\" style=\"opacity:0.8\" />"
             end
 
-            io.print "<text font-size=\"8px\" x=\"#{x}\" y=\"#{pos[:y]}\" fill=\"white\">#{hex[:x]},#{hex[:y]}</text>"
+            if @debug
+               io.print "<text font-size=\"8px\" x=\"#{x}\" y=\"#{pos[:y]}\" fill=\"white\">#{hex[:x]},#{hex[:y]}</text>"
+            end
          }
 
          # Draw lines from non-city/town hexes to their province capitals
-         # @map.each { |key, hex|
-         #    if hex[:province] && hex[:terrain] != "city" && hex[:terrain] != "town"
-         #       province_hex = getHex(hex[:province][:x], hex[:province][:y])
-         #       if province_hex
-         #          start_pos = Emissary::MapUtils::hex_pos(hex[:x], hex[:y], hexsize, xoffset, yoffset)
-         #          end_pos = Emissary::MapUtils::hex_pos(province_hex[:x], province_hex[:y], hexsize, xoffset, yoffset)
-                  
-         #          io.print "<line x1=\"#{start_pos[:x].round(2)}\" y1=\"#{start_pos[:y].round(2)}\" " +
-         #                   "x2=\"#{end_pos[:x].round(2)}\" y2=\"#{end_pos[:y].round(2)}\" " +
-         #                   "stroke=\"red\" stroke-width=\"0.5\" stroke-opacity=\"0.3\" />"
-         #       end
-         #    end
-         # }
+         if @debug
+            @map.each { |key, hex|
+               if hex[:province] && hex[:terrain] != "city" && hex[:terrain] != "town"
+                  province_hex = getHex(hex[:province][:x], hex[:province][:y])
+                  if province_hex
+                     start_pos = Emissary::MapUtils::hex_pos(hex[:x], hex[:y], hexsize, xoffset, yoffset)
+                     end_pos = Emissary::MapUtils::hex_pos(province_hex[:x], province_hex[:y], hexsize, xoffset, yoffset)
+                     
+                     io.print "<line x1=\"#{start_pos[:x].round(2)}\" y1=\"#{start_pos[:y].round(2)}\" " +
+                              "x2=\"#{end_pos[:x].round(2)}\" y2=\"#{end_pos[:y].round(2)}\" " +
+                              "stroke=\"red\" stroke-width=\"0.5\" stroke-opacity=\"0.3\" />"
+                  end
+               end
+            }
+         end
 
 
          # town and city labels
@@ -1380,6 +1385,7 @@ require_relative 'map_utils.rb'
          # draw borders
          @map.each { | key, hex |
             if hex[:terrain] == "city" or hex[:terrain] == "town"
+
                borders = hex[:borders]
                borders.each do |border_coord|
                   border_hex = getHex(border_coord[:x], border_coord[:y])
@@ -1401,7 +1407,7 @@ require_relative 'map_utils.rb'
                      
                      shared_points = border_points.select { |bp|
                         adj_points.any? { |ap| 
-                           (bp[:x] - ap[:x]).abs < 0.01 && (bp[:y] - ap[:y]).abs < 0.01
+                           (bp[:x] - ap[:x]).abs < 0.1 && (bp[:y] - ap[:y]).abs < 0.1
                         }
                      }
 
